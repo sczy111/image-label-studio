@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Label Studio</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Local canvas editor</p>
+        <h1>Image Label Studio</h1>
+      </div>
+      <div class="header-actions">
+        <label class="theme-control" for="theme-toggle">
+          <span id="theme-label">Dark mode</span>
+          <span class="switch">
+            <input id="theme-toggle" type="checkbox">
+            <span></span>
+          </span>
+        </label>
+        <label class="button button-secondary file-button">
+          <input id="image-input" type="file" accept="image/*">
+          Open image
+        </label>
+        <button id="demo-button" class="button button-secondary" type="button">Create demo</button>
+        <button id="export-button" class="button button-primary" type="button">Export PNG</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <aside class="sidebar sidebar-left">
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Document</p>
+              <h2>Canvas</h2>
+            </div>
+          </div>
+          <div class="field-grid two-columns">
+            <label class="field">
+              <span>Width</span>
+              <input id="canvas-width" type="number" min="64" max="8192" step="1">
+            </label>
+            <label class="field">
+              <span>Height</span>
+              <input id="canvas-height" type="number" min="64" max="8192" step="1">
+            </label>
+          </div>
+          <label class="field">
+            <span>Image fit</span>
+            <select id="image-fit">
+              <option value="stretch">Stretch</option>
+              <option value="cover">Cover</option>
+              <option value="contain">Contain</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading inline-heading">
+            <div>
+              <p class="eyebrow">Badge</p>
+              <h2>Day label</h2>
+            </div>
+            <label class="switch">
+              <input id="day-enabled" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <label class="field">
+            <span>Label</span>
+            <input id="day-text" type="text" placeholder="246 or DAY 246">
+          </label>
+          <label class="field">
+            <span>Whole badge scale</span>
+            <input id="day-scale" type="number" min="0.1" max="4" step="0.05">
+          </label>
+          <div class="field-grid two-columns">
+            <label class="field">
+              <span>Font size</span>
+              <input id="day-font-size" type="number" min="10" max="400" step="1">
+            </label>
+            <label class="field">
+              <span>Outer pad</span>
+              <input id="day-outer-pad" type="number" min="0" max="400" step="1">
+            </label>
+            <label class="field">
+              <span>Horizontal pad</span>
+              <input id="day-pad-x" type="number" min="0" max="400" step="1">
+            </label>
+            <label class="field">
+              <span>Vertical pad</span>
+              <input id="day-pad-y" type="number" min="0" max="400" step="1">
+            </label>
+          </div>
+          <div class="field-grid two-columns">
+            <label class="field">
+              <span>Text</span>
+              <input id="day-text-color" type="color">
+            </label>
+            <label class="field">
+              <span>Background</span>
+              <input id="day-bg-color" type="color">
+            </label>
+          </div>
+        </section>
+
+        <section class="panel layers-panel">
+          <div class="panel-heading inline-heading">
+            <div>
+              <p class="eyebrow">Stack</p>
+              <h2>Text layers</h2>
+            </div>
+            <button id="add-layer-button" class="icon-button" type="button" aria-label="Add text layer">+</button>
+          </div>
+          <div id="layer-list" class="layer-list"></div>
+        </section>
+      </aside>
+
+      <section class="workspace-column">
+        <div class="workspace-toolbar">
+          <div>
+            <span id="canvas-size-label">1280 x 720</span>
+            <span class="toolbar-separator"></span>
+            <span id="selected-layer-label">No layer selected</span>
+          </div>
+          <div class="workspace-toolbar-actions">
+            <button id="recenter-button" class="button button-quiet" type="button">Center in available row</button>
+            <button id="delete-layer-button" class="button button-danger" type="button">Delete layer</button>
+          </div>
+        </div>
+        <div id="canvas-stage" class="canvas-stage" tabindex="0" aria-label="Image editor canvas. Drag selected text to position it.">
+          <canvas id="editor-canvas" width="1280" height="720"></canvas>
+          <div id="empty-state" class="empty-state">
+            <strong>Drop an image here</strong>
+            <span>or open an image to begin editing</span>
+          </div>
+        </div>
+        <p class="workspace-hint">Drag a caption directly on the preview. Use arrow keys for one-pixel adjustments, or hold Shift for ten pixels.</p>
+      </section>
+
+      <aside class="sidebar sidebar-right">
+        <section class="panel">
+          <div class="panel-heading">
+            <p class="eyebrow">Inspector</p>
+            <h2 id="inspector-title">Selected text</h2>
+          </div>
+          <div id="inspector-empty" class="inspector-empty">Add or select a text layer to edit its properties.</div>
+          <div id="inspector-fields">
+            <label class="field">
+              <span>Caption</span>
+              <textarea id="layer-text" rows="3"></textarea>
+            </label>
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Center X</span>
+                <input id="layer-x" type="number" step="1">
+              </label>
+              <label class="field">
+                <span>Center Y</span>
+                <input id="layer-y" type="number" step="1">
+              </label>
+            </div>
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Text color</span>
+                <input id="layer-color" type="color">
+              </label>
+              <label class="field">
+                <span>Weight</span>
+                <select id="layer-weight">
+                  <option value="400">Regular</option>
+                  <option value="600">Semi-bold</option>
+                  <option value="700">Bold</option>
+                  <option value="800">Extra-bold</option>
+                </select>
+              </label>
+            </div>
+            <label class="field checkbox-field">
+              <input id="layer-auto-fit" type="checkbox">
+              <span>Auto-fit text to the available row</span>
+            </label>
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Font size</span>
+                <input id="layer-font-size" type="number" min="8" max="600" step="1">
+              </label>
+              <label class="field">
+                <span>Auto max size</span>
+                <input id="layer-auto-max-size" type="number" min="8" max="600" step="1">
+              </label>
+            </div>
+            <div class="field-grid two-columns">
+              <label class="field checkbox-field compact-checkbox">
+                <input id="layer-avoid-day" type="checkbox">
+                <span>Avoid day label</span>
+              </label>
+              <label class="field">
+                <span>Badge gap</span>
+                <input id="layer-day-gap" type="number" min="0" max="400" step="1">
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section id="background-panel" class="panel">
+          <div class="panel-heading inline-heading">
+            <div>
+              <p class="eyebrow">Caption frame</p>
+              <h2>Background</h2>
+            </div>
+            <label class="switch">
+              <input id="layer-bg-enabled" type="checkbox">
+              <span></span>
+            </label>
+          </div>
+          <div id="background-fields">
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Color</span>
+                <input id="layer-bg-color" type="color">
+              </label>
+              <label class="field">
+                <span>Alpha</span>
+                <input id="layer-bg-alpha" type="number" min="0" max="1" step="0.05">
+              </label>
+            </div>
+            <p class="field-note">Alpha uses a normalized range: 0 is transparent and 1 is opaque.</p>
+            <div class="field-grid two-columns">
+              <label class="field">
+                <span>Pad left</span>
+                <input id="layer-bg-pad-left" type="number" min="0" max="400" step="1">
+              </label>
+              <label class="field">
+                <span>Pad right</span>
+                <input id="layer-bg-pad-right" type="number" min="0" max="400" step="1">
+              </label>
+              <label class="field">
+                <span>Pad top</span>
+                <input id="layer-bg-pad-top" type="number" min="0" max="400" step="1">
+              </label>
+              <label class="field">
+                <span>Pad bottom</span>
+                <input id="layer-bg-pad-bottom" type="number" min="0" max="400" step="1">
+              </label>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./app.js?v=20260605-badge-scale"></script>
+  </body>
+</html>
