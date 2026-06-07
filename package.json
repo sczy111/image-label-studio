@@ -1,0 +1,8 @@
+{
+  "name": "image-label-studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node ./tests/test-core.mjs && node ./tests/test-storage.mjs"
+  }
+}

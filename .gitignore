@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+
+# Edited/exported screenshots should stay local.
+day*.png
+*_labelled.png
+
+# Local editor/runtime noise.
+.DS_Store
+Thumbs.db
