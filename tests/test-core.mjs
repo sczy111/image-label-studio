@@ -86,6 +86,21 @@ assert.equal(middleLayout.backgroundBounds.right, middleLayout.textBounds.right 
 assert.equal(middleLayout.backgroundBounds.top, middleLayout.textBounds.top - 30);
 assert.equal(middleLayout.backgroundBounds.bottom, middleLayout.textBounds.bottom + 40);
 
+const multilineLayout = calculateTextLayout(ctx, createLayer({
+  text: "Short\nLonger caption",
+  y: 360,
+  autoFit: false,
+  fontSize: 80
+}), badge, 1280);
+assert.equal(multilineLayout.lines.length, 2);
+assert.equal(multilineLayout.lines[0].text, "Short");
+assert.equal(multilineLayout.lines[1].text, "Longer caption");
+assert.ok(multilineLayout.lines[1].baselineY > multilineLayout.lines[0].baselineY);
+assert.equal(multilineLayout.metrics.width, "Longer caption".length * 80 * 0.58);
+assert.ok(multilineLayout.metrics.height > 80);
+assert.equal(multilineLayout.backgroundBounds.top, multilineLayout.textBounds.top - 30);
+assert.equal(multilineLayout.backgroundBounds.bottom, multilineLayout.textBounds.bottom + 40);
+
 const topLayer = createLayer({ y: 50 });
 const topLayout = calculateTextLayout(ctx, topLayer, badge, 1280);
 assert.ok(topLayout.row.right <= badge.x - topLayer.dayBadgeGap);

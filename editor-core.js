@@ -47,6 +47,33 @@ export function measureVisibleText(ctx, text, font) {
   };
 }
 
+export function textLines(text) {
+  const lines = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
+  return lines.length ? lines : [""];
+}
+
+export function measureMultilineText(ctx, text, font, fontSize) {
+  const lines = textLines(text);
+  const measuredLines = lines.map((line) => ({
+    text: line,
+    metrics: measureVisibleText(ctx, line, font)
+  }));
+  const maxWidth = measuredLines.reduce((maximum, line) => Math.max(maximum, line.metrics.width), 1);
+  const maxAscent = measuredLines.reduce((maximum, line) => Math.max(maximum, line.metrics.ascent), 1);
+  const maxDescent = measuredLines.reduce((maximum, line) => Math.max(maximum, line.metrics.descent), 1);
+  const lineHeight = Math.max(1, fontSize * 1.12, maxAscent + maxDescent);
+  const height = maxAscent + maxDescent + lineHeight * (measuredLines.length - 1);
+
+  return {
+    width: maxWidth,
+    height: Math.max(1, height),
+    ascent: maxAscent,
+    descent: maxDescent,
+    lineHeight,
+    lines: measuredLines
+  };
+}
+
 export function getBackgroundPadding(layer) {
   if (!layer.backgroundEnabled) {
     return { left: 0, right: 0, top: 0, bottom: 0 };
@@ -128,7 +155,7 @@ function fitFontSize(ctx, layer, badge, canvasWidth, padding) {
 
   for (let size = maxSize; size >= minSize; size -= 2) {
     const font = fontString(size, layer.fontFamily, layer.fontWeight);
-    const metrics = measureVisibleText(ctx, layer.text, font);
+    const metrics = measureMultilineText(ctx, layer.text, font, size);
     const row = availableRowBounds(layer, badge, canvasWidth, metrics, padding);
     if (metrics.width + padding.left + padding.right <= row.width) {
       return size;
@@ -142,12 +169,18 @@ export function calculateTextLayout(ctx, layer, badge, canvasWidth) {
   const padding = getBackgroundPadding(layer);
   const fontSize = fitFontSize(ctx, layer, badge, canvasWidth, padding);
   const font = fontString(fontSize, layer.fontFamily, layer.fontWeight);
-  const metrics = measureVisibleText(ctx, layer.text, font);
+  const metrics = measureMultilineText(ctx, layer.text, font, fontSize);
   const row = availableRowBounds(layer, badge, canvasWidth, metrics, padding);
   const x = numberOr(layer.x, canvasWidth / 2);
   const y = numberOr(layer.y, 0);
-  const baselineX = x + (metrics.left - metrics.right) / 2;
-  const baselineY = y + (metrics.ascent - metrics.descent) / 2;
+  const firstBaselineY = y - metrics.height / 2 + metrics.ascent;
+  const lines = metrics.lines.map((line, index) => ({
+    text: line.text,
+    baselineX: x + (line.metrics.left - line.metrics.right) / 2,
+    baselineY: firstBaselineY + index * metrics.lineHeight,
+    metrics: line.metrics
+  }));
+  const firstLine = lines[0] ?? { baselineX: x, baselineY: y };
 
   return {
     x,
@@ -156,8 +189,9 @@ export function calculateTextLayout(ctx, layer, badge, canvasWidth) {
     fontSize,
     metrics,
     row,
-    baselineX,
-    baselineY,
+    baselineX: firstLine.baselineX,
+    baselineY: firstLine.baselineY,
+    lines,
     textBounds: {
       left: x - metrics.width / 2,
       right: x + metrics.width / 2,
@@ -177,7 +211,7 @@ export function getSmartCenterX(ctx, layer, badge, canvasWidth) {
   const padding = getBackgroundPadding(layer);
   const fontSize = fitFontSize(ctx, layer, badge, canvasWidth, padding);
   const font = fontString(fontSize, layer.fontFamily, layer.fontWeight);
-  const metrics = measureVisibleText(ctx, layer.text, font);
+  const metrics = measureMultilineText(ctx, layer.text, font, fontSize);
   const row = availableRowBounds(layer, badge, canvasWidth, metrics, padding);
   return row.left + row.width / 2;
 }

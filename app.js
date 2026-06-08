@@ -7,8 +7,8 @@ import {
   getSmartCenterX,
   pointInBounds,
   toAlphaByte
-} from "./editor-core.js?v=20260605-badge-scale";
-import { restoreSettings, saveSettings } from "./editor-storage.js?v=20260605-badge-scale";
+} from "./editor-core.js?v=20260608-frame-resize";
+import { restoreSettings, saveSettings } from "./editor-storage.js?v=20260608-frame-resize";
 
 const canvas = document.querySelector("#editor-canvas");
 const ctx = canvas.getContext("2d");
@@ -16,6 +16,20 @@ const stage = document.querySelector("#canvas-stage");
 const emptyState = document.querySelector("#empty-state");
 const layerList = document.querySelector("#layer-list");
 const toast = document.querySelector("#toast");
+const FRAME_HANDLE_SIZE = 16;
+const FRAME_HANDLE_HIT_SIZE = 26;
+const MAX_FRAME_PADDING = 2000;
+const FRAME_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+const FRAME_HANDLE_CURSORS = {
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  nw: "nwse-resize",
+  se: "nwse-resize"
+};
 
 const state = {
   theme: "dark",
@@ -192,7 +206,9 @@ function drawTextLayer(layer, badge, drawSelection = true) {
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = layer.color;
-  ctx.fillText(layer.text, layout.baselineX, layout.baselineY);
+  for (const line of layout.lines) {
+    ctx.fillText(line.text, line.baselineX, line.baselineY);
+  }
   ctx.restore();
 
   if (drawSelection && layer.id === state.selectedLayerId) {
@@ -202,6 +218,15 @@ function drawTextLayer(layer, badge, drawSelection = true) {
     ctx.lineWidth = Math.max(1, state.width / 640);
     ctx.setLineDash([8, 6]);
     ctx.strokeRect(box.left, box.top, box.right - box.left, box.bottom - box.top);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#68d4c2";
+    ctx.strokeStyle = "rgba(12, 17, 23, 0.72)";
+    ctx.lineWidth = Math.max(1, state.width / 960);
+    for (const handle of FRAME_HANDLES) {
+      const point = frameHandlePoint(box, handle);
+      ctx.fillRect(point.x - FRAME_HANDLE_SIZE / 2, point.y - FRAME_HANDLE_SIZE / 2, FRAME_HANDLE_SIZE, FRAME_HANDLE_SIZE);
+      ctx.strokeRect(point.x - FRAME_HANDLE_SIZE / 2, point.y - FRAME_HANDLE_SIZE / 2, FRAME_HANDLE_SIZE, FRAME_HANDLE_SIZE);
+    }
     ctx.restore();
   }
 
@@ -408,6 +433,38 @@ function eventPoint(event) {
   };
 }
 
+function frameHandlePoint(box, handle) {
+  const centerX = (box.left + box.right) / 2;
+  const centerY = (box.top + box.bottom) / 2;
+  const x = handle.includes("w") ? box.left : handle.includes("e") ? box.right : centerX;
+  const y = handle.includes("n") ? box.top : handle.includes("s") ? box.bottom : centerY;
+  return { x, y };
+}
+
+function pointInHandle(point, handlePoint) {
+  const halfSize = FRAME_HANDLE_HIT_SIZE / 2;
+  return point.x >= handlePoint.x - halfSize &&
+    point.x <= handlePoint.x + halfSize &&
+    point.y >= handlePoint.y - halfSize &&
+    point.y <= handlePoint.y + halfSize;
+}
+
+function resizeHitTest(point) {
+  const layer = selectedLayer();
+  if (!layer) {
+    return null;
+  }
+
+  const layout = calculateTextLayout(ctx, layer, currentBadge(), state.width);
+  for (const handle of FRAME_HANDLES) {
+    if (pointInHandle(point, frameHandlePoint(layout.backgroundBounds, handle))) {
+      return { layer, handle };
+    }
+  }
+
+  return null;
+}
+
 function hitTest(point) {
   const badge = currentBadge();
   for (const layer of [...state.layers].reverse()) {
@@ -419,16 +476,64 @@ function hitTest(point) {
   return null;
 }
 
+function setCanvasCursor(cursor = "") {
+  canvas.style.cursor = cursor;
+}
+
+function applyFrameResize(layer, drag, point) {
+  const dx = point.x - drag.startX;
+  const dy = point.y - drag.startY;
+
+  if (drag.handle.includes("w")) {
+    layer.backgroundPadLeft = clamp(drag.startPadding.left - dx, 0, MAX_FRAME_PADDING);
+  }
+  if (drag.handle.includes("e")) {
+    layer.backgroundPadRight = clamp(drag.startPadding.right + dx, 0, MAX_FRAME_PADDING);
+  }
+  if (drag.handle.includes("n")) {
+    layer.backgroundPadTop = clamp(drag.startPadding.top - dy, 0, MAX_FRAME_PADDING);
+  }
+  if (drag.handle.includes("s")) {
+    layer.backgroundPadBottom = clamp(drag.startPadding.bottom + dy, 0, MAX_FRAME_PADDING);
+  }
+}
+
 canvas.addEventListener("pointerdown", (event) => {
   const point = eventPoint(event);
+  const resizeHit = resizeHitTest(point);
+  if (resizeHit) {
+    state.selectedLayerId = resizeHit.layer.id;
+    state.drag = {
+      mode: "resize",
+      id: resizeHit.layer.id,
+      handle: resizeHit.handle,
+      startX: point.x,
+      startY: point.y,
+      startPadding: {
+        left: Number(resizeHit.layer.backgroundPadLeft) || 0,
+        right: Number(resizeHit.layer.backgroundPadRight) || 0,
+        top: Number(resizeHit.layer.backgroundPadTop) || 0,
+        bottom: Number(resizeHit.layer.backgroundPadBottom) || 0
+      }
+    };
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add("is-dragging");
+    setCanvasCursor(FRAME_HANDLE_CURSORS[resizeHit.handle]);
+    syncInspector();
+    renderLayerList();
+    render();
+    return;
+  }
+
   const layer = hitTest(point);
   if (!layer) {
     return;
   }
   state.selectedLayerId = layer.id;
-  state.drag = { id: layer.id, dx: point.x - layer.x, dy: point.y - layer.y };
+  state.drag = { mode: "move", id: layer.id, dx: point.x - layer.x, dy: point.y - layer.y };
   canvas.setPointerCapture(event.pointerId);
   canvas.classList.add("is-dragging");
+  setCanvasCursor("grabbing");
   syncInspector();
   renderLayerList();
   render();
@@ -443,15 +548,37 @@ canvas.addEventListener("pointermove", (event) => {
     return;
   }
   const point = eventPoint(event);
-  layer.x = clamp(point.x - state.drag.dx, 0, state.width);
-  layer.y = clamp(point.y - state.drag.dy, 0, state.height);
+  if (state.drag.mode === "resize") {
+    applyFrameResize(layer, state.drag, point);
+    setCanvasCursor(FRAME_HANDLE_CURSORS[state.drag.handle]);
+  } else {
+    layer.x = clamp(point.x - state.drag.dx, 0, state.width);
+    layer.y = clamp(point.y - state.drag.dy, 0, state.height);
+    setCanvasCursor("grabbing");
+  }
   syncInspector();
   render();
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (state.drag) {
+    return;
+  }
+
+  const point = eventPoint(event);
+  const resizeHit = resizeHitTest(point);
+  if (resizeHit) {
+    setCanvasCursor(FRAME_HANDLE_CURSORS[resizeHit.handle]);
+    return;
+  }
+
+  setCanvasCursor(hitTest(point) ? "grab" : "");
 });
 
 function endDrag() {
   state.drag = null;
   canvas.classList.remove("is-dragging");
+  setCanvasCursor("");
 }
 
 canvas.addEventListener("pointerup", endDrag);
